@@ -2,6 +2,20 @@
 
 An AI lab project that recommends movies for two viewers. The experiment asks whether putting extra weight on the lower predicted rating increases the chance that both viewers enjoy a recommendation.
 
+## Project notebook
+
+[Movie Night for Two](Movie_Night_for_Two.ipynb) walks through the model with
+fictional profiles and displays the public benchmark charts. The saved plots
+are visible in GitHub. To rerun the notebook from the repository root:
+
+```bash
+python -m pip install jupyter matplotlib
+jupyter notebook Movie_Night_for_Two.ipynb
+```
+
+The main notebook runs without the MovieLens downloads. The final section
+lists commands to reproduce the benchmarks from public data.
+
 ## Run the first prototype
 
 Use Python 3.10 or later. Download [MovieLens Latest Small](https://mooc.grouplens.org/datasets/movielens/latest/) and extract it under `data/` so that `data/ml-latest-small/movies.csv` is available. Commands run from the repository root.
