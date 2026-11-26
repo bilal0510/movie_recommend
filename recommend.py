@@ -23,6 +23,7 @@ class Prediction:
 
 @dataclass(frozen=True)
 class Recommendation:
+    movie_id: int
     movie: Movie
     first: Prediction
     second: Prediction
@@ -102,9 +103,9 @@ def recommend(
         first_prediction = predict(movie, movies, first)
         second_prediction = predict(movie, movies, second)
         score = group_score(first_prediction.score, second_prediction.score, balance)
-        candidates.append((movie_id, Recommendation(movie, first_prediction, second_prediction, score)))
-    candidates.sort(key=lambda entry: (-entry[1].score, entry[1].movie.title.casefold(), entry[0]))
-    return [recommendation for _, recommendation in candidates]
+        candidates.append(Recommendation(movie_id, movie, first_prediction, second_prediction, score))
+    candidates.sort(key=lambda item: (-item.score, item.movie.title.casefold(), item.movie_id))
+    return candidates
 
 
 def main() -> None:

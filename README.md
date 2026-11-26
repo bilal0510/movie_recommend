@@ -12,7 +12,26 @@ python3 recommend.py --viewer-a 1=5 2=2 --viewer-b 1=3 2=5
 python3 recommend.py --viewer-a 1=5 2=2 --viewer-b 1=3 2=5 --balance 0
 ```
 
-Use `--movies PATH` for a catalog stored elsewhere. Each viewer can rate any number of movies on a 0.5–5 scale. Results exclude movies rated by either viewer and display the strongest genre match that influenced each prediction.
+Use `--movies PATH` for a catalog stored elsewhere. Each viewer can rate any number of movies on a 0.5–5 scale. Results exclude movies rated by either viewer and show which rated movie contributed most to each prediction.
+
+## Interactive demo
+
+With the MovieLens files in place, run these commands from the project directory.
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m streamlit run app.py
+```
+
+Use **Try example ratings** for an instant comparison. To enter your own ratings,
+search for a title under each viewer, choose a score, and save it. Select a
+previously rated movie to change or remove its rating. Ratings stay in the
+current browser session.
+
+Compare the five picks in each column and expand a pick to see the genre
+evidence. Move the slider to 0 to make **Balanced** match **Average**, or to
+1 to rank by the lower predicted rating alone.
 
 ## Model
 
