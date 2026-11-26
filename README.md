@@ -71,3 +71,33 @@ metrics. These results describe reranking movies that both viewers chose to
 rate, which favors titles with broad visibility and limits what we can infer
 about recommendations across the full catalog. The two runs describe observed
 differences without estimating statistical uncertainty.
+
+### How many ratings should each viewer provide?
+
+```bash
+python3 evaluate.py --profile-sizes 3 5 10
+python3 evaluate.py --profile-sizes 3 5 10 --seed 17
+```
+
+This comparison requires at least 10 available ratings per viewer after hiding
+20 shared movies. Each viewer's remaining ratings are shuffled once per sampled
+pair. The first 3 ratings are included in the first 5, and the first 5 are
+included in the first 10. The test movies and viewer pairs stay fixed within
+each run. Popularity uses the same candidate lists and is reported once.
+
+| Ranking | Ratings per viewer | Both liked (seed 42) | Mean rating (seed 42) | Both liked (seed 17) | Mean rating (seed 17) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Popularity | — | 51.8% | 3.999 | 50.3% | 3.991 |
+| Average | 3 | 39.9% | 3.782 | 40.9% | 3.811 |
+| Average | 5 | 39.5% | 3.791 | 39.3% | 3.796 |
+| Average | 10 | 43.7% | 3.853 | 41.9% | 3.843 |
+| Balanced | 3 | 39.7% | 3.773 | 41.0% | 3.813 |
+| Balanced | 5 | 39.9% | 3.780 | 39.5% | 3.801 |
+| Balanced | 10 | 43.4% | 3.869 | 41.8% | 3.838 |
+
+Ten ratings per viewer gave the genre model its highest joint approval and mean
+rating in both runs. Five showed mixed results relative to three, and popularity
+still led. Ten is a reasonable target for the demo when viewers have enough
+movies to rate. This experiment varies the number of personal ratings. A later
+experiment can vary the amount of population data available to a collaborative
+model.
