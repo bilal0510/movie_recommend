@@ -4,7 +4,7 @@ from functools import lru_cache
 from math import sqrt
 from statistics import mean
 
-from recommend import NEUTRAL
+from recommend import NEUTRAL, Movie, Prediction
 
 
 class HybridModel:
@@ -30,17 +30,43 @@ class HybridModel:
         return cosine * len(shared) / (len(shared) + 10)
 
     def predict(self, movie_id: int, profile: dict[int, float], genre_score: float) -> float:
+        score, _, _ = self._estimate(movie_id, profile, genre_score)
+        return score
+
+    def explain(
+        self, movie_id: int, profile: dict[int, float], genre: Prediction, movies: dict[int, Movie]
+    ) -> Prediction:
+        score, rated_id, contribution = self._estimate(movie_id, profile, genre.score)
+        if rated_id is None:
+            return Prediction(score, f"{genre.evidence}\nNo MovieLens relationship contributed a rating adjustment.")
+        direction = "raised" if contribution > 0 else "lowered"
+        movie = movies[rated_id].title
+        return Prediction(
+            score,
+            f"{genre.evidence}\nMovieLens relationship with {movie} "
+            f"({profile[rated_id]:g}/5) {direction} the rating-based estimate most.",
+        )
+
+    def _estimate(
+        self, movie_id: int, profile: dict[int, float], genre_score: float
+    ) -> tuple[float, int | None, float]:
         deviation = 0.0
         weight = 0.0
+        strongest_id = None
+        strongest_contribution = 0.0
         for rated_id, rating in profile.items():
             first, second = sorted((movie_id, rated_id))
             similarity = self.similarity(first, second)
-            deviation += similarity * (rating - NEUTRAL)
+            contribution = similarity * (rating - NEUTRAL)
+            deviation += contribution
             weight += abs(similarity)
+            if abs(contribution) > abs(strongest_contribution):
+                strongest_id = rated_id
+                strongest_contribution = contribution
 
         if not weight:
-            return genre_score
+            return genre_score, None, 0.0
 
         # Treat the genre estimate as one vote and add collaborative evidence.
         score = NEUTRAL + (genre_score - NEUTRAL + deviation) / (1 + weight)
-        return min(5.0, max(0.5, score))
+        return min(5.0, max(0.5, score)), strongest_id, strongest_contribution

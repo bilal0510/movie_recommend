@@ -29,8 +29,9 @@ search for a title under each viewer, choose a score, and save it. Select a
 previously rated movie to change or remove its rating. Ratings stay in the
 current browser session.
 
-Compare the five picks in each column and expand a pick to see the genre
-evidence. Move the slider to 0 to make **Balanced** match **Average**, or to
+Compare the five picks in each column. Use **Prediction model** to switch
+between Genre and Hybrid with the same viewer ratings. Expand a pick to see
+the genre evidence and, in Hybrid mode, which rating relationship mattered most. Move the slider to 0 to make **Balanced** match **Average**, or to
 1 to rank by the lower predicted rating alone.
 
 ## Model
@@ -137,4 +138,5 @@ Both hybrid rankings improved on both metrics as training size increased in
 these runs. Popularity still led, and the hybrid rule with the higher joint
 approval rate at full training size varied by seed. This experiment uses a
 separate test-user split, so compare methods within each run. The Streamlit
-demo uses the genre model.
+demo offers both models and uses the full local MovieLens catalog of ratings
+for Hybrid mode.

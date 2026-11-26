@@ -6,7 +6,8 @@ from pathlib import Path
 import streamlit as st
 
 from evaluate import load_ratings
-from recommend import Movie, Recommendation, group_score, load_movies, recommend
+from hybrid import HybridModel
+from recommend import Movie, Prediction, Recommendation, group_score, load_movies, recommend
 
 DATA_DIR = Path(__file__).resolve().parent / "data" / "ml-latest-small"
 EXAMPLE = ({1: 5.0, 2: 2.0}, {1: 3.0, 2: 5.0})
@@ -21,12 +22,26 @@ def load_catalog(path: Path) -> tuple[dict[int, Movie], Counter[int]]:
     return movies, popularity
 
 
+@st.cache_resource
+def load_hybrid(path: Path) -> HybridModel:
+    movies, _ = load_catalog(path)
+    return HybridModel(load_ratings(path / "ratings.csv", movies))
+
+
 @st.cache_data(max_entries=16)
 def score_catalog(
-    path: Path, first: dict[int, float], second: dict[int, float]
+    path: Path, first: dict[int, float], second: dict[int, float], model_name: str
 ) -> list[Recommendation]:
     movies, _ = load_catalog(path)
-    return recommend(movies, first, second, balance=0)
+    if model_name == "Genre":
+        return recommend(movies, first, second, balance=0)
+
+    model = load_hybrid(path)
+
+    def adjust(movie_id: int, profile: dict[int, float], genre: Prediction) -> Prediction:
+        return model.explain(movie_id, profile, genre, movies)
+
+    return recommend(movies, first, second, balance=0, adjust=adjust)
 
 
 def edit_profile(
@@ -117,6 +132,12 @@ def main() -> None:
 
     st.divider()
     st.header("Recommendations")
+    model_name = st.radio(
+        "Prediction model",
+        ("Genre", "Hybrid"),
+        horizontal=True,
+        help="Hybrid combines genre overlap with movie relationships learned from MovieLens ratings.",
+    )
     balance = st.slider(
         "Weight on the lower predicted rating",
         min_value=0.0,
@@ -126,7 +147,7 @@ def main() -> None:
         help="Applies to Balanced. At 0 it matches Average. At 1 only the lower prediction counts.",
     )
 
-    average = score_catalog(DATA_DIR, first, second)
+    average = score_catalog(DATA_DIR, first, second, model_name)
     if not average:
         st.info("No unrated movies remain.")
         return

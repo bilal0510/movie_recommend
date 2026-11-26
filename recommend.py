@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+from collections.abc import Callable
 from dataclasses import dataclass
 from math import sqrt
 from pathlib import Path
@@ -96,12 +97,17 @@ def recommend(
     first: dict[int, float],
     second: dict[int, float],
     balance: float,
+    *,
+    adjust: Callable[[int, dict[int, float], Prediction], Prediction] | None = None,
 ) -> list[Recommendation]:
     candidates = []
     for movie_id in movies.keys() - first.keys() - second.keys():
         movie = movies[movie_id]
         first_prediction = predict(movie, movies, first)
         second_prediction = predict(movie, movies, second)
+        if adjust is not None:
+            first_prediction = adjust(movie_id, first, first_prediction)
+            second_prediction = adjust(movie_id, second, second_prediction)
         score = group_score(first_prediction.score, second_prediction.score, balance)
         candidates.append(Recommendation(movie_id, movie, first_prediction, second_prediction, score))
     candidates.sort(key=lambda item: (-item.score, item.movie.title.casefold(), item.movie_id))
