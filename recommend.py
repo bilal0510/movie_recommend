@@ -85,6 +85,11 @@ def predict(movie: Movie, movies: dict[int, Movie], ratings: dict[int, float]) -
     return Prediction(NEUTRAL + weighted_deviation / (1 + total_similarity), evidence)
 
 
+def group_score(first: float, second: float, balance: float) -> float:
+    average = (first + second) / 2
+    return (1 - balance) * average + balance * min(first, second)
+
+
 def recommend(
     movies: dict[int, Movie],
     first: dict[int, float],
@@ -96,9 +101,7 @@ def recommend(
         movie = movies[movie_id]
         first_prediction = predict(movie, movies, first)
         second_prediction = predict(movie, movies, second)
-        average = (first_prediction.score + second_prediction.score) / 2
-        lower = min(first_prediction.score, second_prediction.score)
-        score = (1 - balance) * average + balance * lower
+        score = group_score(first_prediction.score, second_prediction.score, balance)
         candidates.append((movie_id, Recommendation(movie, first_prediction, second_prediction, score)))
     candidates.sort(key=lambda entry: (-entry[1].score, entry[1].movie.title.casefold(), entry[0]))
     return [recommendation for _, recommendation in candidates]
