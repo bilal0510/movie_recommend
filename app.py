@@ -2,7 +2,6 @@
 
 from collections import Counter
 from html import escape
-from itertools import islice
 from os import environ
 from pathlib import Path
 from zipfile import BadZipFile
@@ -59,30 +58,13 @@ def edit_profile(
     st.subheader(f"Viewer {label}")
     profile_key = f"profile_{label}"
     profile = st.session_state[profile_key]
-    options = list(movie_labels)
-    if len(options) > 20_000:
-        query = st.text_input(
-            f"Search for Viewer {label}", key=f"search_{label}",
-            placeholder="Enter at least two letters",
-        ).strip().casefold()
-        matches = []
-        if len(query) >= 2:
-            matches = list(islice(
-                (option for option in options if query in movie_labels[option].casefold()), 101
-            ))
-            if not matches:
-                st.caption("No matching titles.")
-            elif len(matches) > 100:
-                st.caption("Showing 100 matches. Enter more of the title to narrow the search.")
-        options = list(dict.fromkeys([*matches[:100], *profile]))
     movie_id = st.selectbox(
-        f"Choose a movie for Viewer {label}",
-        options,
+        f"Find a movie for Viewer {label}",
+        list(movie_labels),
         index=None,
         format_func=movie_labels.__getitem__,
-        placeholder="Choose a movie" if len(movie_labels) > 20_000 else "Type a movie title",
+        placeholder="Type a title, then choose a match",
         key=f"movie_{label}",
-        disabled=not options,
     )
     if movie_id is not None:
         rating = st.number_input(
@@ -167,7 +149,6 @@ def main() -> None:
             st.session_state.profile_B = EXAMPLE[1].copy()
             for label in ("A", "B"):
                 st.session_state.pop(f"movie_{label}", None)
-                st.session_state.pop(f"search_{label}", None)
 
     movie_ids = sorted(movies, key=lambda movie_id: (movies[movie_id].title.casefold(), movie_id))
     title_counts = Counter(movie.title for movie in movies.values())

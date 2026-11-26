@@ -25,7 +25,7 @@ python3 -m venv .venv
 ```
 
 Use **Try example ratings** for an instant comparison. To enter your own ratings,
-search for a title under each viewer, choose a score, and save it. Select a
+type and select a title in each viewer's movie picker, choose a score, and save it. Select a
 previously rated movie to change or remove its rating. Ratings stay in the
 current browser session.
 
