@@ -140,3 +140,34 @@ approval rate at full training size varied by seed. This experiment uses a
 separate test-user split, so compare methods within each run. The Streamlit
 demo offers both models and uses the full local MovieLens catalog of ratings
 for Hybrid mode.
+
+## Movie metadata coverage audit
+
+The audit uses [MovieLens 32M](https://files.grouplens.org/datasets/movielens/ml-32m-README.html)
+and [Kaggle's TMDB + IMDb snapshot, version 1074](https://www.kaggle.com/datasets/alanvourch/tmdb-movies-daily-updates/versions/1074)
+from November 26, 2026. Save the two ZIP downloads under the ignored `data/`
+directory and run:
+
+```bash
+python3 audit_metadata.py --movielens data/ml-32m.zip --metadata data/tmdb-movies-daily-updates.zip
+```
+
+The join uses the TMDB ID in MovieLens `links.csv` first, then falls back to a
+unique IMDb ID when there is no TMDB match. Duplicate keys and disagreements
+between the IDs are excluded. Of 87,585 MovieLens titles, 86,020 matched by
+TMDB ID and 477 by IMDb fallback. The audit found 189 conflicts and 899
+unmatched titles.
+
+| MovieLens cohort | Films | Matched | Director | Cast | Plot overview | All three |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| All films | 87,585 | 98.8% | 98.2% | 95.2% | 98.5% | 94.6% |
+| Released 2020 or later | 7,986 | 99.0% | 98.3% | 96.1% | 98.8% | 95.5% |
+| Five or fewer ratings | 47,180 | 98.9% | 97.9% | 93.7% | 98.4% | 92.7% |
+| More than five ratings | 40,405 | 98.6% | 98.5% | 97.0% | 98.6% | 96.9% |
+
+Coverage counts nonempty fields as a share of all films in each cohort, including
+unmatched films in the denominator. Release years come from MovieLens titles.
+The rating-count cohorts use the full dataset and describe coverage only.
+For the recommendation experiment, define sparse titles using training ratings
+and evaluate director, principal cast, and plot separately against genres on
+the same held-out movies. This audit measures availability of the fields.
