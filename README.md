@@ -208,3 +208,42 @@ cannot distinguish these methods.
 The sparse prediction-error check had only two pair-film observations in
 seed 42 and zero in seed 17. A test designed to sample these films directly
 is needed to draw conclusions about them.
+
+## Hybrid benchmark on MovieLens 32M
+
+```bash
+python3 evaluate_hybrid.py --data-dir data/ml-32m.zip --training-users 20000 --pairs 500
+python3 evaluate_hybrid.py --data-dir data/ml-32m.zip --training-users 20000 --pairs 500 --seed 17
+```
+
+The evaluator streams the user-sorted ratings and samples whole user profiles.
+For each seed, it reserves 1,200 sampled users for testing and fits the same
+hybrid model on nested sets of 5,000, 10,000, and 20,000 training users. The
+20,000-user cap bounds memory and computation. Each comparison uses the same
+500 eligible pairs, 10 input ratings per viewer, and 20 shared held-out movies
+per pair. Test users contribute to neither hybrid training nor popularity.
+
+**Popularity** counts ratings from the full dataset after excluding the test
+users. **Popularity (sample)** uses the same 20,000-user sample as the largest
+hybrid model. Both popularity rankings stay fixed across the training-size
+comparison.
+
+| Method | Both liked (seed 42) | Mean rating (seed 42) | Both liked (seed 17) | Mean rating (seed 17) |
+| --- | ---: | ---: | ---: | ---: |
+| Popularity | 52.1% | 4.038 | 52.0% | 4.043 |
+| Popularity (sample) | 52.4% | 4.043 | 51.9% | 4.042 |
+| Genre Average | 43.8% | 3.894 | 43.1% | 3.896 |
+| Genre Balanced | 43.8% | 3.897 | 43.6% | 3.896 |
+| Hybrid Average, 5,000 users | 50.8% | 4.034 | 48.0% | 3.992 |
+| Hybrid Balanced, 5,000 users | 50.7% | 4.023 | 47.9% | 3.987 |
+| Hybrid Average, 10,000 users | 52.5% | 4.045 | 48.5% | 4.008 |
+| Hybrid Balanced, 10,000 users | 51.7% | 4.028 | 49.1% | 4.005 |
+| Hybrid Average, 20,000 users | 52.1% | 4.045 | 49.2% | 4.006 |
+| Hybrid Balanced, 20,000 users | 51.7% | 4.031 | 48.4% | 3.991 |
+
+Moving from 5,000 to 10,000 training users improved both metrics under
+both group rules in these runs. The gains from 10,000 to 20,000 were mixed.
+Hybrid matched or slightly exceeded popularity on seed 42 for some settings.
+Popularity led on seed 17, and the results do not establish a consistent
+hybrid advantage. The comparison ranks shared, previously rated movies and
+reports observed differences without estimating statistical uncertainty.

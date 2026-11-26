@@ -11,7 +11,7 @@ from random import Random
 from zipfile import BadZipFile
 
 from audit_metadata import has_text, load_catalog, load_metadata, match, open_csv
-from recommend import NEUTRAL, Movie, group_score, predict
+from recommend import NEUTRAL, group_score, predict, read_movies
 
 FEATURES = ("Director", "Cast", "Plot")
 WORDS = re.compile(r"[^\W\d_]{2,}", re.UNICODE)
@@ -207,12 +207,7 @@ def main() -> None:
 
     try:
         with open_csv(args.movielens, "movies.csv") as stream:
-            movies = {
-                int(row["movieId"]): Movie(
-                    row["title"], frozenset(row["genres"].split("|")) - {"", "(no genres listed)"}
-                )
-                for row in csv.DictReader(stream)
-            }
+            movies = read_movies(stream)
         credits = load_features(args.movielens, args.metadata)
         profiles, popularity = sample_profiles(args.movielens, 1200, args.seed)
     except (OSError, ValueError, BadZipFile, KeyError) as error:

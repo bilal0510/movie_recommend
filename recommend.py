@@ -31,16 +31,20 @@ class Recommendation:
     score: float
 
 
+def read_movies(source) -> dict[int, Movie]:
+    reader = csv.DictReader(source)
+    if not {"movieId", "title", "genres"}.issubset(reader.fieldnames or ()):
+        raise ValueError("The movie catalog must have movieId, title, and genres columns.")
+    movies = {}
+    for row in reader:
+        genres = frozenset(row["genres"].split("|")) - {"", "(no genres listed)"}
+        movies[int(row["movieId"])] = Movie(row["title"], genres)
+    return movies
+
+
 def load_movies(path: Path) -> dict[int, Movie]:
     with path.open(encoding="utf-8-sig", newline="") as source:
-        reader = csv.DictReader(source)
-        if not {"movieId", "title", "genres"}.issubset(reader.fieldnames or ()):
-            raise ValueError("The movie catalog must have movieId, title, and genres columns.")
-        movies = {}
-        for row in reader:
-            genres = frozenset(row["genres"].split("|")) - {"", "(no genres listed)"}
-            movies[int(row["movieId"])] = Movie(row["title"], genres)
-    return movies
+        return read_movies(source)
 
 
 def parse_ratings(tokens: list[str], movies: dict[int, Movie]) -> dict[int, float]:
