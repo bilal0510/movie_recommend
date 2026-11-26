@@ -30,8 +30,8 @@ previously rated movie to change or remove its rating. Ratings stay in the
 current browser session.
 
 Compare the five picks in each column. Use **Prediction model** to switch
-between Genre and Hybrid with the same viewer ratings. Expand a pick to see
-the genre evidence and, in Hybrid mode, which rating relationship mattered most. Move the slider to 0% to make **Balanced** match **Average**, or to
+between Genre, Hybrid, and Hybrid + rating prior with the same viewer ratings. Expand a pick to see
+the genre evidence and, in either Hybrid mode, which rating relationship mattered most. Move the slider to 0% to make **Balanced** match **Average**, or to
 100% to rank by the lower predicted rating alone.
 
 ### Final demo with MovieLens 32M
@@ -269,3 +269,35 @@ Hybrid matched or slightly exceeded popularity on seed 42 for some settings.
 Popularity led on seed 17, and the results do not establish a consistent
 hybrid advantage. The comparison ranks shared, previously rated movies and
 reports observed differences without estimating statistical uncertainty.
+
+## Community rating as a ranking signal
+
+The demo defaults to **Hybrid + rating prior**. It adds a small adjustment
+to the group ranking based on the movie's mean community rating relative to
+the training-set mean. The adjustment shrinks toward zero with fewer votes.
+Both viewer predictions are displayed on their original scale. Choose plain
+**Hybrid** to inspect the personalized ranking by itself.
+
+```bash
+python3 evaluate_hybrid.py --data-dir data/ml-32m.zip --training-users 20000 --pairs 500 --compare-priors
+python3 evaluate_hybrid.py --data-dir data/ml-32m.zip --training-users 20000 --pairs 500 --compare-priors --seed 17
+python3 evaluate_hybrid.py --data-dir data/ml-32m.zip --training-users 20000 --pairs 500 --compare-priors --seed 91
+```
+
+Each seed uses the 10,000-user hybrid training subset for both personalized
+scores and the prior. The table reports the fraction of top-five picks both
+test viewers rated at least 4 stars.
+
+| Method | Seed 42 | Seed 17 | Seed 91 |
+| --- | ---: | ---: | ---: |
+| Popularity, full training population | 52.1% | 52.0% | 51.6% |
+| Hybrid Average | 52.5% | 48.5% | 49.0% |
+| Hybrid Average + rating prior | 57.7% | 54.3% | 55.5% |
+| Hybrid Balanced + rating prior | 57.4% | 54.1% | 55.3% |
+| Community rating alone | 58.4% | 56.1% | 56.0% |
+
+The rating prior improved Hybrid and the blended ranking exceeded Popularity
+on all three runs. The community rating alone scored highest in all three
+on both reported metrics. That outcome applies to reranking shared rated
+films. It leaves open whether personalization helps viewers discover films
+across the catalog.

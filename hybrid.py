@@ -1,10 +1,33 @@
 """Blend genre predictions with adjusted-cosine movie similarity."""
 
+from collections import Counter
+from collections.abc import Iterable
 from functools import lru_cache
 from math import sqrt
 from statistics import mean
 
 from recommend import NEUTRAL, Movie, Prediction
+
+
+def community_rating_prior(
+    profiles: Iterable[dict[int, float]],
+) -> tuple[Counter[int], dict[int, float]]:
+    counts: Counter[int] = Counter()
+    sums: Counter[int] = Counter()
+    for profile in profiles:
+        counts.update(profile.keys())
+        sums.update(profile)
+
+    if not counts:
+        return counts, {}
+
+    mean_rating = sums.total() / counts.total()
+    # Shrink each movie toward the global mean with 25 ratings' worth of weight.
+    prior = {
+        movie: 0.5 * (sums[movie] - mean_rating * count) / (count + 25)
+        for movie, count in counts.items()
+    }
+    return counts, prior
 
 
 class HybridModel:

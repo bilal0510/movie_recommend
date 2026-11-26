@@ -3,6 +3,7 @@
 import argparse
 from collections import Counter
 from itertools import combinations
+from math import log1p
 from pathlib import Path
 from random import Random
 from zipfile import BadZipFile
@@ -11,7 +12,7 @@ from audit_metadata import open_csv
 
 from evaluate import DEFAULT_DATA, load_ratings
 from evaluate_metadata import sample_profiles
-from hybrid import HybridModel
+from hybrid import HybridModel, community_rating_prior
 from recommend import group_score, load_movies, predict, read_movies
 
 TRAINING_FRACTIONS = (25, 50, 100)
@@ -33,6 +34,7 @@ def main() -> None:
     parser.add_argument("--pairs", type=int, default=300)
     parser.add_argument("--training-users", type=int, help="Cap the largest training sample.")
     parser.add_argument("--test-users", type=int, default=1200, help="Test sample in capped mode.")
+    parser.add_argument("--compare-priors", action="store_true", help="Test catalog priors using half of the training pool.")
     args = parser.parse_args()
     if args.pairs < 1:
         parser.error("--pairs must be positive.")
@@ -72,6 +74,8 @@ def main() -> None:
         parser.error("Need enough users to form separate training and test sets.")
 
     sizes = {fraction: max(1, len(training_users) * fraction // 100) for fraction in TRAINING_FRACTIONS}
+    if args.compare_priors:
+        sizes = {50: sizes[50]}
     models = {
         fraction: HybridModel({user: ratings[user] for user in training_users[:size]})
         for fraction, size in sizes.items()
@@ -80,6 +84,15 @@ def main() -> None:
         sampled_popularity = None
     else:
         sampled_popularity = Counter(movie for user in training_users for movie in ratings[user])
+
+    if args.compare_priors:
+        prior_counts, quality_prior = community_rating_prior(
+            ratings[user] for user in training_users[:sizes[50]]
+        )
+        max_log_count = log1p(max(prior_counts.values(), default=1))
+        exposure_prior = {
+            movie: 0.75 * log1p(count) / max_log_count for movie, count in prior_counts.items()
+        }
 
     pairs = list(combinations(test_users, 2))
     rng.shuffle(pairs)
@@ -102,6 +115,8 @@ def main() -> None:
         scores = {"Popularity": popularity}
         if sampled_popularity is not None:
             scores["Popularity (sample)"] = sampled_popularity
+        if args.compare_priors:
+            scores["Community rating"] = quality_prior
         for movie in held_out:
             genre_first = predict(movies[movie], movies, first_profile).score
             genre_second = predict(movies[movie], movies, second_profile).score
@@ -110,6 +125,16 @@ def main() -> None:
                 predictions[f"Hybrid {fraction}%"] = (
                     model.predict(movie, first_profile, genre_first),
                     model.predict(movie, second_profile, genre_second),
+                )
+
+            if args.compare_priors:
+                hybrid_first, hybrid_second = predictions["Hybrid 50%"]
+                mean_score = group_score(hybrid_first, hybrid_second, 0)
+                scores.setdefault("Hybrid + popularity", {})[movie] = mean_score + exposure_prior.get(movie, 0)
+                adjustment = quality_prior.get(movie, 0)
+                scores.setdefault("Hybrid + rating prior", {})[movie] = mean_score + adjustment
+                scores.setdefault("Balanced + rating prior", {})[movie] = (
+                    group_score(hybrid_first, hybrid_second, 0.5) + adjustment
                 )
 
             for model_name, (first_score, second_score) in predictions.items():
@@ -121,7 +146,7 @@ def main() -> None:
         for method, ranking in scores.items():
             ranked = sorted(
                 held_out,
-                key=lambda movie: (-ranking[movie], movies[movie].title.casefold(), movie),
+                key=lambda movie: (-ranking.get(movie, 0), movies[movie].title.casefold(), movie),
             )
             for movie in ranked[:5]:
                 both_liked[method] += min(first[movie], second[movie]) >= 4

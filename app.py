@@ -11,7 +11,7 @@ import streamlit as st
 
 from audit_metadata import open_csv
 from evaluate import read_ratings
-from hybrid import HybridModel
+from hybrid import HybridModel, community_rating_prior
 from recommend import Movie, Prediction, Recommendation, group_score, read_movies, recommend
 
 DATA_DIR = Path(__file__).resolve().parent / "data" / "ml-latest-small"
@@ -21,18 +21,18 @@ STYLE = Path(__file__).resolve().parent / "assets" / "demo.css"
 
 
 @st.cache_data
-def load_catalog(path: Path) -> tuple[dict[int, Movie], Counter[int]]:
+def load_catalog(path: Path) -> tuple[dict[int, Movie], Counter[int], dict[int, float]]:
     with open_csv(path, "movies.csv") as source:
         movies = read_movies(source)
     with open_csv(path, "ratings.csv") as source:
         profiles = read_ratings(source, movies)
-    popularity = Counter(movie_id for profile in profiles.values() for movie_id in profile)
-    return movies, popularity
+    popularity, rating_prior = community_rating_prior(profiles.values())
+    return movies, popularity, rating_prior
 
 
 @st.cache_resource
 def load_hybrid(path: Path) -> HybridModel:
-    movies, _ = load_catalog(path)
+    movies, _, _ = load_catalog(path)
     with open_csv(path, "ratings.csv") as source:
         return HybridModel(read_ratings(source, movies))
 
@@ -41,7 +41,7 @@ def load_hybrid(path: Path) -> HybridModel:
 def score_catalog(
     path: Path, first: dict[int, float], second: dict[int, float], model_name: str
 ) -> list[Recommendation]:
-    movies, _ = load_catalog(path)
+    movies, _, _ = load_catalog(path)
     if model_name == "Genre":
         return recommend(movies, first, second, balance=0)
 
@@ -138,7 +138,7 @@ def main() -> None:
 
     data_path = Path(environ.get("MOVIE_RECOMMEND_DATA", DATA_DIR)).expanduser().resolve()
     try:
-        movies, popularity = load_catalog(data_path)
+        movies, popularity, rating_prior = load_catalog(data_path)
     except (OSError, ValueError, KeyError, BadZipFile) as error:
         st.error("Could not load the MovieLens dataset. See the README for setup.")
         st.caption(str(error))
@@ -193,9 +193,10 @@ def main() -> None:
         with model_column:
             model_name = st.radio(
                 "Prediction model",
-                ("Genre", "Hybrid"),
+                ("Genre", "Hybrid", "Hybrid + rating prior"),
+                index=2,
                 horizontal=True,
-                help="Hybrid combines genre overlap with movie relationships learned from MovieLens ratings.",
+                help="The rating prior uses a movie’s community rating and discounts it when few people rated the movie.",
             )
         with balance_column:
             balance = st.slider(
@@ -207,19 +208,26 @@ def main() -> None:
                 format="%d%%",
                 help="At 0%, Balanced matches Average. At 100%, only the lower prediction counts.",
             ) / 100
-    average = score_catalog(data_path, first, second, model_name)
+    base_model = "Genre" if model_name == "Genre" else "Hybrid"
+    average = score_catalog(data_path, first, second, base_model)
     if not average:
         st.info("No unrated movies remain.")
         return
 
+    adjustments = rating_prior if model_name == "Hybrid + rating prior" else {}
+
+    def ranking_score(item: Recommendation, balance_weight: float) -> float:
+        return group_score(item.first.score, item.second.score, balance_weight) + adjustments.get(item.movie_id, 0)
+
+    def ranking_key(item: Recommendation, balance_weight: float):
+        return -ranking_score(item, balance_weight), item.movie.title.casefold(), item.movie_id
+
     popular = sorted(average, key=lambda item: (
         -popularity[item.movie_id], item.movie.title.casefold(), item.movie_id
     ))
-    balanced = sorted(average, key=lambda item: (
-        -group_score(item.first.score, item.second.score, balance),
-        item.movie.title.casefold(),
-        item.movie_id,
-    ))
+    if adjustments:
+        average.sort(key=lambda item: ranking_key(item, 0))
+    balanced = sorted(average, key=lambda item: ranking_key(item, balance))
 
     columns = st.columns(3)
     with columns[0]:
@@ -229,15 +237,21 @@ def main() -> None:
             show_pick("popularity", number, item, f"{popularity[item.movie_id]:,} MovieLens ratings")
     with columns[1]:
         st.subheader("Average")
-        st.caption("Ranked by the mean of both predictions.")
+        st.caption("Mean of both predictions" + (" plus the rating prior." if adjustments else "."))
         for number, item in enumerate(average[:TOP_K], 1):
-            show_pick("average", number, item, f"Mean prediction {item.score:.2f}/5")
+            detail = f"Mean prediction {item.score:.2f}/5"
+            if adjustments:
+                detail += f" · Rating prior {adjustments.get(item.movie_id, 0):+.2f}"
+            show_pick("average", number, item, detail)
     with columns[2]:
         st.subheader("Balanced")
-        st.caption("Ranked by a blend of the mean and the lower prediction.")
+        st.caption("Blend of the mean and lower prediction" + (" plus the rating prior." if adjustments else "."))
         for number, item in enumerate(balanced[:TOP_K], 1):
             score = group_score(item.first.score, item.second.score, balance)
-            show_pick("balanced", number, item, f"Balanced score {score:.2f}/5")
+            detail = f"Balanced prediction {score:.2f}/5"
+            if adjustments:
+                detail += f" · Rating prior {adjustments.get(item.movie_id, 0):+.2f}"
+            show_pick("balanced", number, item, detail)
 
 
 if __name__ == "__main__":
