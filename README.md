@@ -171,3 +171,40 @@ The rating-count cohorts use the full dataset and describe coverage only.
 For the recommendation experiment, define sparse titles using training ratings
 and evaluate director, principal cast, and plot separately against genres on
 the same held-out movies. This audit measures availability of the fields.
+
+## Does movie metadata improve recommendations?
+
+```bash
+python3 evaluate_metadata.py
+python3 evaluate_metadata.py --seed 17
+```
+
+Each run samples 1,200 MovieLens 32M users and evaluates 500 eligible pairs.
+Both viewers supply 10 ratings. Each method ranks the same 20 held-out movies
+that both viewers rated. The popularity baseline counts ratings from users
+outside the evaluation sample. Personalized methods rank by the average of
+the two predicted scores.
+
+Each enriched model blends genre cosine similarity equally with one extra
+signal when that signal is available for both films. Director and the first
+five listed cast members use cosine similarity over sets of names. Plot uses
+TF-IDF cosine similarity over overview words. Missing features fall back to
+genre similarity for that film comparison.
+
+| Method | Both liked (seed 42) | Mean rating (seed 42) | Both liked (seed 17) | Mean rating (seed 17) |
+| --- | ---: | ---: | ---: | ---: |
+| Popularity | 50.2% | 4.000 | 53.2% | 4.057 |
+| Genres | 41.7% | 3.828 | 44.1% | 3.882 |
+| Genres + director | 41.5% | 3.824 | 44.6% | 3.888 |
+| Genres + cast | 41.3% | 3.828 | 44.4% | 3.884 |
+| Genres + plot | 41.5% | 3.823 | 44.6% | 3.888 |
+
+All three enriched methods had lower joint approval on seed 42 and higher
+joint approval on seed 17. The results show no consistent gain using this
+blend and test protocol. They describe reranking shared, previously rated
+movies. No evaluated pair had more than five held-out films with at most
+100 training ratings, so a separate top-five ranking for sparse films
+cannot distinguish these methods.
+The sparse prediction-error check had only two pair-film observations in
+seed 42 and zero in seed 17. A test designed to sample these films directly
+is needed to draw conclusions about them.

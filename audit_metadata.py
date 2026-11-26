@@ -65,7 +65,11 @@ def load_catalog(path: Path):
     return {movie: int(year[1]) if year else None for movie, year in movies.items()}, links
 
 
-def load_metadata(path: Path, links):
+def field_presence(row):
+    return tuple(has_text(row[field]) for field in FEATURES)
+
+
+def load_metadata(path: Path, links, extract_fields=field_presence):
     wanted_tmdb = {tmdb for tmdb, _ in links.values()} - {""}
     wanted_imdb = {imdb for _, imdb in links.values()} - {""}
     by_tmdb, by_imdb = {}, {}
@@ -74,7 +78,7 @@ def load_metadata(path: Path, links):
             tmdb, imdb = row["id"].strip(), imdb_id(row["imdb_id"])
             if tmdb not in wanted_tmdb and imdb not in wanted_imdb:
                 continue
-            record = (tmdb, imdb, tuple(has_text(row[field]) for field in FEATURES))
+            record = (tmdb, imdb, extract_fields(row))
             if tmdb in wanted_tmdb:
                 by_tmdb[tmdb] = None if tmdb in by_tmdb else record
             if imdb in wanted_imdb:
