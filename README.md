@@ -34,6 +34,28 @@ between Genre and Hybrid with the same viewer ratings. Expand a pick to see
 the genre evidence and, in Hybrid mode, which rating relationship mattered most. Move the slider to 0 to make **Balanced** match **Average**, or to
 1 to rank by the lower predicted rating alone.
 
+### Final demo with MovieLens 32M
+
+Place the MovieLens 32M archive at `data/ml-32m.zip` and install the
+Streamlit requirements above. Generate the demo archive once, then launch it.
+
+```bash
+python3 prepare_demo.py
+MOVIE_RECOMMEND_DATA=data/ml-32m-demo.zip .venv/bin/python -m streamlit run app.py
+```
+
+The prepared archive uses the first 10,000 training users from the seed-42
+32M benchmark split, totaling 1,576,794 ratings. Its film catalog comes from
+MovieLens 32M. The demo counts popularity within its training sample and
+ranks the catalog, while the benchmark reranks shared held-out films. The
+archive stays under the ignored `data/` directory.
+
+For a live walkthrough, use **Try example ratings** and compare **Average**
+under **Genre** and **Hybrid**. With Hybrid selected, move the balance slider
+from 0 to 0.5 and compare **Balanced** with **Average**. Expand a pick to show
+which of the viewers' ratings influenced its scores. The original launch
+command above still opens MovieLens Latest Small.
+
 ## Model
 
 Each movie is represented by its genres. The model compares the candidate's genres with those of each rated movie using cosine similarity. It averages the rating deviations from 3, weighted by similarity, with an additional neutral vote to account for sparse evidence. A movie without matching genres receives a neutral prediction.

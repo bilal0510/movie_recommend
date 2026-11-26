@@ -12,15 +12,19 @@ from recommend import Movie, group_score, load_movies, predict
 DEFAULT_DATA = Path("data/ml-latest-small")
 
 
-def load_ratings(path: Path, movies: dict[int, Movie]) -> dict[int, dict[int, float]]:
+def read_ratings(source, movies: dict[int, Movie]) -> dict[int, dict[int, float]]:
     ratings = {}
-    with path.open(encoding="utf-8-sig", newline="") as source:
-        for row in csv.DictReader(source):
-            user = int(row["userId"])
-            movie = int(row["movieId"])
-            if movie in movies:
-                ratings.setdefault(user, {})[movie] = float(row["rating"])
+    for row in csv.DictReader(source):
+        user = int(row["userId"])
+        movie = int(row["movieId"])
+        if movie in movies:
+            ratings.setdefault(user, {})[movie] = float(row["rating"])
     return ratings
+
+
+def load_ratings(path: Path, movies: dict[int, Movie]) -> dict[int, dict[int, float]]:
+    with path.open(encoding="utf-8-sig", newline="") as source:
+        return read_ratings(source, movies)
 
 
 def evaluate(movies, ratings, pair_limit, top_k, holdout_size, seed, profile_sizes=(None,)):

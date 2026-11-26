@@ -1,13 +1,16 @@
 """Interactive comparison of movie rankings for two viewers."""
 
 from collections import Counter
+from os import environ
 from pathlib import Path
+from zipfile import BadZipFile
 
 import streamlit as st
 
-from evaluate import load_ratings
+from audit_metadata import open_csv
+from evaluate import read_ratings
 from hybrid import HybridModel
-from recommend import Movie, Prediction, Recommendation, group_score, load_movies, recommend
+from recommend import Movie, Prediction, Recommendation, group_score, read_movies, recommend
 
 DATA_DIR = Path(__file__).resolve().parent / "data" / "ml-latest-small"
 EXAMPLE = ({1: 5.0, 2: 2.0}, {1: 3.0, 2: 5.0})
@@ -16,8 +19,10 @@ TOP_K = 5
 
 @st.cache_data
 def load_catalog(path: Path) -> tuple[dict[int, Movie], Counter[int]]:
-    movies = load_movies(path / "movies.csv")
-    profiles = load_ratings(path / "ratings.csv", movies)
+    with open_csv(path, "movies.csv") as source:
+        movies = read_movies(source)
+    with open_csv(path, "ratings.csv") as source:
+        profiles = read_ratings(source, movies)
     popularity = Counter(movie_id for profile in profiles.values() for movie_id in profile)
     return movies, popularity
 
@@ -25,10 +30,11 @@ def load_catalog(path: Path) -> tuple[dict[int, Movie], Counter[int]]:
 @st.cache_resource
 def load_hybrid(path: Path) -> HybridModel:
     movies, _ = load_catalog(path)
-    return HybridModel(load_ratings(path / "ratings.csv", movies))
+    with open_csv(path, "ratings.csv") as source:
+        return HybridModel(read_ratings(source, movies))
 
 
-@st.cache_data(max_entries=16)
+@st.cache_data(max_entries=4)
 def score_catalog(
     path: Path, first: dict[int, float], second: dict[int, float], model_name: str
 ) -> list[Recommendation]:
@@ -50,12 +56,21 @@ def edit_profile(
     st.subheader(f"Viewer {label}")
     profile_key = f"profile_{label}"
     profile = st.session_state[profile_key]
+    options = list(movie_labels)
+    if len(options) > 20_000:
+        query = st.text_input(f"Search for Viewer {label}", key=f"search_{label}").strip().casefold()
+        matches = [option for option in options if query in movie_labels[option].casefold()] if len(query) >= 2 else []
+        if len(query) >= 2 and not matches:
+            st.caption("No matching titles.")
+        elif len(matches) > 100:
+            st.caption("Showing the first 100 matches. Add more of the title to narrow the search.")
+        options = list(dict.fromkeys([*matches[:100], *profile]))
     movie_id = st.selectbox(
         f"Find a movie for Viewer {label}",
-        list(movie_labels),
+        options,
         index=None,
         format_func=movie_labels.__getitem__,
-        placeholder="Type a movie title",
+        placeholder="Choose a movie" if len(movie_labels) > 20_000 else "Type a movie title",
         key=f"movie_{label}",
     )
     if movie_id is not None:
@@ -98,13 +113,19 @@ def main() -> None:
     st.title("Movie Night for Two")
     st.write("Rate movies for each viewer, then see how three ranking methods choose a shared pick.")
 
+    data_path = Path(environ.get("MOVIE_RECOMMEND_DATA", DATA_DIR)).expanduser().resolve()
     try:
-        movies, popularity = load_catalog(DATA_DIR)
-    except (OSError, ValueError, KeyError) as error:
-        st.error("Download and extract MovieLens Latest Small under data/. See the README for setup.")
+        movies, popularity = load_catalog(data_path)
+    except (OSError, ValueError, KeyError, BadZipFile) as error:
+        st.error("Could not load the MovieLens dataset. See the README for setup.")
         st.caption(str(error))
         st.stop()
 
+    dataset_label = {
+        "ml-latest-small": "MovieLens Latest Small",
+        "ml-32m-demo": "MovieLens 32M · 10,000 training users",
+    }.get(data_path.stem, data_path.stem)
+    st.caption(f"Dataset · {dataset_label} · {len(movies):,} films")
     st.session_state.setdefault("profile_A", {})
     st.session_state.setdefault("profile_B", {})
     if EXAMPLE[0].keys() <= movies.keys() and st.button("Try example ratings", help="Replaces both viewers’ current ratings."):
@@ -147,7 +168,7 @@ def main() -> None:
         help="Applies to Balanced. At 0 it matches Average. At 1 only the lower prediction counts.",
     )
 
-    average = score_catalog(DATA_DIR, first, second, model_name)
+    average = score_catalog(data_path, first, second, model_name)
     if not average:
         st.info("No unrated movies remain.")
         return

@@ -18,6 +18,14 @@ TRAINING_FRACTIONS = (25, 50, 100)
 PROFILE_SIZE = 10
 
 
+def sample_split(path: Path, training_users: int, test_users: int, seed: int, rng: Random):
+    profiles, popularity = sample_profiles(path, training_users + test_users, seed)
+    if len(profiles) < training_users + test_users:
+        raise ValueError("Dataset has fewer users than requested.")
+    rng.shuffle(profiles)
+    return profiles, popularity
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA)
@@ -44,12 +52,9 @@ def main() -> None:
         else:
             with open_csv(args.data_dir, "movies.csv") as stream:
                 movies = read_movies(stream)
-            profiles, popularity = sample_profiles(
-                args.data_dir, args.training_users + args.test_users, args.seed
+            profiles, popularity = sample_split(
+                args.data_dir, args.training_users, args.test_users, args.seed, rng
             )
-            if len(profiles) < args.training_users + args.test_users:
-                parser.error("Dataset has fewer users than requested.")
-            rng.shuffle(profiles)
             ratings = {
                 index: {movie: rating for movie, rating in profile.items() if movie in movies}
                 for index, profile in enumerate(profiles)
