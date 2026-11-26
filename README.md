@@ -24,7 +24,10 @@ python3 -m venv .venv
 .venv/bin/python -m streamlit run app.py
 ```
 
-Use **Try example ratings** for an instant comparison. To enter your own ratings,
+Choose an **Example** and click **Try example ratings** to fill both profiles.
+The Toy Story vs. Jumanji preset reproduces the original walkthrough. Try
+**Sci-fi fans** for shared tastes, **Horror vs. animation** for opposing
+ratings, or **Mystery vs. character drama** for a mix of overlap and disagreement. To enter your own ratings,
 search for a title under each viewer, choose a score, and save it. Select a
 previously rated movie to change or remove its rating. Ratings stay in the
 current browser session.

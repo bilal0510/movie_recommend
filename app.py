@@ -15,7 +15,24 @@ from hybrid import HybridModel, community_rating_prior
 from recommend import Movie, Prediction, Recommendation, group_score, read_movies, recommend
 
 DATA_DIR = Path(__file__).resolve().parent / "data" / "ml-latest-small"
-EXAMPLE = ({1: 5.0, 2: 2.0}, {1: 3.0, 2: 5.0})
+EXAMPLES = {
+    "Toy Story vs. Jumanji": (
+        {1: 5.0, 2: 2.0},
+        {1: 3.0, 2: 5.0},
+    ),
+    "Sci-fi fans": (
+        {79132: 5.0, 109487: 4.5, 2571: 5.0, 32: 4.0, 1240: 3.0},
+        {79132: 4.5, 109487: 5.0, 2571: 4.0, 1240: 4.5, 1214: 3.0},
+    ),
+    "Horror vs. animation": (
+        {1214: 5.0, 1387: 4.5, 593: 5.0, 4306: 2.0, 6377: 2.5, 1197: 4.0},
+        {1214: 2.0, 1387: 2.5, 593: 2.0, 4306: 5.0, 6377: 4.5, 1197: 4.5},
+    ),
+    "Mystery vs. character drama": (
+        {47: 5.0, 50: 4.5, 4226: 5.0, 1704: 3.0, 356: 2.5},
+        {47: 2.0, 4226: 3.5, 1704: 5.0, 356: 4.5, 318: 5.0},
+    ),
+}
 TOP_K = 5
 STYLE = Path(__file__).resolve().parent / "assets" / "demo.css"
 
@@ -157,17 +174,28 @@ def main() -> None:
     """)
     st.session_state.setdefault("profile_A", {})
     st.session_state.setdefault("profile_B", {})
-    ratings_heading, example_action = st.columns([3, 1], vertical_alignment="center")
-    ratings_heading.header("Viewer ratings")
-    with example_action:
-        if EXAMPLE[0].keys() <= movies.keys() and st.button(
+    available_examples = {
+        name: (first, second)
+        for name, (first, second) in EXAMPLES.items()
+        if (first.keys() | second.keys()) <= movies.keys()
+    }
+    if available_examples:
+        ratings_heading, example_picker, example_action = st.columns(
+            [2, 2, 1.3], vertical_alignment="bottom"
+        )
+        ratings_heading.header("Viewer ratings")
+        example_name = example_picker.selectbox("Example", list(available_examples), key="example")
+        if example_action.button(
             "Try example ratings", type="primary", help="Replaces both viewers’ current ratings."
         ):
-            st.session_state.profile_A = EXAMPLE[0].copy()
-            st.session_state.profile_B = EXAMPLE[1].copy()
+            first_example, second_example = available_examples[example_name]
+            st.session_state.profile_A = first_example.copy()
+            st.session_state.profile_B = second_example.copy()
             for label in ("A", "B"):
                 st.session_state.pop(f"movie_{label}", None)
                 st.session_state.pop(f"search_{label}", None)
+    else:
+        st.header("Viewer ratings")
 
     movie_ids = sorted(movies, key=lambda movie_id: (movies[movie_id].title.casefold(), movie_id))
     title_counts = Counter(movie.title for movie in movies.values())
