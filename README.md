@@ -101,3 +101,40 @@ still led. Ten is a reasonable target for the demo when viewers have enough
 movies to rate. This experiment varies the number of personal ratings. A later
 experiment can vary the amount of population data available to a collaborative
 model.
+
+### Does more population data improve the hybrid model?
+
+```bash
+python3 evaluate_hybrid.py
+python3 evaluate_hybrid.py --seed 17
+```
+
+The hybrid combines genre predictions with adjusted cosine similarity between
+movies. Each training user's ratings are centered around their own mean.
+Movie pairs need at least three shared raters, and similarities with low
+support are shrunk toward zero. The hybrid uses the genre estimate when there
+is no collaborative evidence.
+
+For each seed, the evaluator reserves 152 MovieLens users for testing and
+uses nested samples of 114, 229, and 458 of the remaining users. Each run
+tests 300 pairs with 10 known ratings per viewer and the same 20 shared
+held-out movies across every method. The popularity baseline counts ratings
+from the full training split.
+
+| Method | Both liked (seed 42) | Mean rating (seed 42) | Both liked (seed 17) | Mean rating (seed 17) |
+| --- | ---: | ---: | ---: | ---: |
+| Popularity | 49.5% | 3.937 | 52.1% | 3.997 |
+| Genre Average | 37.7% | 3.774 | 38.7% | 3.770 |
+| Genre Balanced | 37.5% | 3.767 | 38.8% | 3.765 |
+| Hybrid 25% Average | 42.0% | 3.856 | 44.2% | 3.902 |
+| Hybrid 25% Balanced | 41.7% | 3.849 | 43.1% | 3.885 |
+| Hybrid 50% Average | 43.1% | 3.868 | 45.3% | 3.933 |
+| Hybrid 50% Balanced | 42.1% | 3.860 | 46.3% | 3.931 |
+| Hybrid 100% Average | 45.1% | 3.905 | 48.3% | 3.966 |
+| Hybrid 100% Balanced | 45.5% | 3.899 | 47.5% | 3.954 |
+
+Both hybrid rankings improved on both metrics as training size increased in
+these runs. Popularity still led, and the hybrid rule with the higher joint
+approval rate at full training size varied by seed. This experiment uses a
+separate test-user split, so compare methods within each run. The Streamlit
+demo uses the genre model.
