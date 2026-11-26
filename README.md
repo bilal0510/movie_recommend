@@ -31,8 +31,8 @@ current browser session.
 
 Compare the five picks in each column. Use **Prediction model** to switch
 between Genre and Hybrid with the same viewer ratings. Expand a pick to see
-the genre evidence and, in Hybrid mode, which rating relationship mattered most. Move the slider to 0 to make **Balanced** match **Average**, or to
-1 to rank by the lower predicted rating alone.
+the genre evidence and, in Hybrid mode, which rating relationship mattered most. Move the slider to 0% to make **Balanced** match **Average**, or to
+100% to rank by the lower predicted rating alone.
 
 ### Final demo with MovieLens 32M
 
@@ -52,7 +52,7 @@ archive stays under the ignored `data/` directory.
 
 For a live walkthrough, use **Try example ratings** and compare **Average**
 under **Genre** and **Hybrid**. With Hybrid selected, move the balance slider
-from 0 to 0.5 and compare **Balanced** with **Average**. Expand a pick to show
+from 0% to 50% and compare **Balanced** with **Average**. Expand a pick to show
 which of the viewers' ratings influenced its scores. The original launch
 command above still opens MovieLens Latest Small.
 

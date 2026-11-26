@@ -1,6 +1,8 @@
 """Interactive comparison of movie rankings for two viewers."""
 
 from collections import Counter
+from html import escape
+from itertools import islice
 from os import environ
 from pathlib import Path
 from zipfile import BadZipFile
@@ -15,6 +17,7 @@ from recommend import Movie, Prediction, Recommendation, group_score, read_movie
 DATA_DIR = Path(__file__).resolve().parent / "data" / "ml-latest-small"
 EXAMPLE = ({1: 5.0, 2: 2.0}, {1: 3.0, 2: 5.0})
 TOP_K = 5
+STYLE = Path(__file__).resolve().parent / "assets" / "demo.css"
 
 
 @st.cache_data
@@ -58,20 +61,28 @@ def edit_profile(
     profile = st.session_state[profile_key]
     options = list(movie_labels)
     if len(options) > 20_000:
-        query = st.text_input(f"Search for Viewer {label}", key=f"search_{label}").strip().casefold()
-        matches = [option for option in options if query in movie_labels[option].casefold()] if len(query) >= 2 else []
-        if len(query) >= 2 and not matches:
-            st.caption("No matching titles.")
-        elif len(matches) > 100:
-            st.caption("Showing the first 100 matches. Add more of the title to narrow the search.")
+        query = st.text_input(
+            f"Search for Viewer {label}", key=f"search_{label}",
+            placeholder="Enter at least two letters",
+        ).strip().casefold()
+        matches = []
+        if len(query) >= 2:
+            matches = list(islice(
+                (option for option in options if query in movie_labels[option].casefold()), 101
+            ))
+            if not matches:
+                st.caption("No matching titles.")
+            elif len(matches) > 100:
+                st.caption("Showing 100 matches. Enter more of the title to narrow the search.")
         options = list(dict.fromkeys([*matches[:100], *profile]))
     movie_id = st.selectbox(
-        f"Find a movie for Viewer {label}",
+        f"Choose a movie for Viewer {label}",
         options,
         index=None,
         format_func=movie_labels.__getitem__,
         placeholder="Choose a movie" if len(movie_labels) > 20_000 else "Type a movie title",
         key=f"movie_{label}",
+        disabled=not options,
     )
     if movie_id is not None:
         rating = st.number_input(
@@ -83,35 +94,47 @@ def edit_profile(
             key=f"rating_{label}_{movie_id}",
         )
         save, remove = st.columns(2)
-        if save.button("Save rating", key=f"save_{label}"):
+        if save.button("Save rating", key=f"save_{label}", type="primary"):
             profile[movie_id] = rating
         if remove.button("Remove rating", key=f"remove_{label}", disabled=movie_id not in profile):
             profile.pop(movie_id, None)
             st.session_state.pop(f"rating_{label}_{movie_id}", None)
             st.rerun()
     if profile:
-        st.caption(f"{len(profile)} rated")
-        for rated_id, rating in profile.items():
-            st.text(f"{movies[rated_id].title} · {rating:g}/5")
+        st.caption(f"Saved ratings · {len(profile)}")
+        rows = "".join(
+            f"<li><span>{escape(movies[rated_id].title)}</span><strong>{rating:g}/5</strong></li>"
+            for rated_id, rating in profile.items()
+        )
+        st.html(f'<ul class="rating-list">{rows}</ul>')
     else:
-        st.caption("Add a rating to get recommendations.")
+        st.caption("Saved ratings will appear here.")
     return profile
 
 
-def show_pick(number: int, item: Recommendation, ranking_detail: str) -> None:
-    with st.container(border=True):
-        st.text(f"{number}. {item.movie.title}")
-        st.caption(ranking_detail)
-        st.write(f"Viewer A **{item.first.score:.2f}/5** · Viewer B **{item.second.score:.2f}/5**")
-        with st.expander("What influenced the predictions?"):
-            st.text(f"A · {item.first.evidence}")
-            st.text(f"B · {item.second.evidence}")
+def show_pick(method: str, number: int, item: Recommendation, ranking_detail: str) -> None:
+    with st.container(border=True, key=f"pick_{method}_{number}"):
+        st.html(f"""
+            <div class="pick-title">
+                <span class="pick-rank">{number}.</span>
+                <span>{escape(item.movie.title)}</span>
+            </div>
+            <p class="pick-detail">{escape(ranking_detail)}</p>
+            <div class="pick-scores">
+                <div class="pick-score"><span>Viewer A</span><strong>{item.first.score:.2f}/5</strong></div>
+                <div class="pick-score"><span>Viewer B</span><strong>{item.second.score:.2f}/5</strong></div>
+            </div>
+        """)
+        with st.expander("Why this pick?"):
+            st.html(f"""
+                <p class="pick-evidence"><strong>Viewer A</strong><br>{escape(item.first.evidence)}</p>
+                <p class="pick-evidence"><strong>Viewer B</strong><br>{escape(item.second.evidence)}</p>
+            """)
 
 
 def main() -> None:
     st.set_page_config(page_title="Movie Night for Two", page_icon="🎬", layout="wide")
-    st.title("Movie Night for Two")
-    st.write("Rate movies for each viewer, then see how three ranking methods choose a shared pick.")
+    st.html(STYLE)
 
     data_path = Path(environ.get("MOVIE_RECOMMEND_DATA", DATA_DIR)).expanduser().resolve()
     try:
@@ -125,14 +148,26 @@ def main() -> None:
         "ml-latest-small": "MovieLens Latest Small",
         "ml-32m-demo": "MovieLens 32M · 10,000 training users",
     }.get(data_path.stem, data_path.stem)
-    st.caption(f"Dataset · {dataset_label} · {len(movies):,} films")
+    st.html(f"""
+        <header class="demo-hero">
+            <div class="demo-dataset">{escape(dataset_label)} · {len(movies):,} films</div>
+            <h1>Movie Night for Two</h1>
+            <p>Rate a few films each and see which picks suit you both.</p>
+        </header>
+    """)
     st.session_state.setdefault("profile_A", {})
     st.session_state.setdefault("profile_B", {})
-    if EXAMPLE[0].keys() <= movies.keys() and st.button("Try example ratings", help="Replaces both viewers’ current ratings."):
-        st.session_state.profile_A = EXAMPLE[0].copy()
-        st.session_state.profile_B = EXAMPLE[1].copy()
-        for label in ("A", "B"):
-            st.session_state.pop(f"movie_{label}", None)
+    ratings_heading, example_action = st.columns([3, 1], vertical_alignment="center")
+    ratings_heading.header("Viewer ratings")
+    with example_action:
+        if EXAMPLE[0].keys() <= movies.keys() and st.button(
+            "Try example ratings", type="primary", help="Replaces both viewers’ current ratings."
+        ):
+            st.session_state.profile_A = EXAMPLE[0].copy()
+            st.session_state.profile_B = EXAMPLE[1].copy()
+            for label in ("A", "B"):
+                st.session_state.pop(f"movie_{label}", None)
+                st.session_state.pop(f"search_{label}", None)
 
     movie_ids = sorted(movies, key=lambda movie_id: (movies[movie_id].title.casefold(), movie_id))
     title_counts = Counter(movie.title for movie in movies.values())
@@ -144,30 +179,34 @@ def main() -> None:
         for movie_id in movie_ids
     }
     first_col, second_col = st.columns(2)
-    with first_col:
+    with first_col, st.container(border=True, key="viewer_a"):
         first = edit_profile("A", movies, movie_labels)
-    with second_col:
+    with second_col, st.container(border=True, key="viewer_b"):
         second = edit_profile("B", movies, movie_labels)
     if not first or not second:
+        st.info("Save at least one rating per viewer, or try the example to see the recommendations.")
         return
 
-    st.divider()
     st.header("Recommendations")
-    model_name = st.radio(
-        "Prediction model",
-        ("Genre", "Hybrid"),
-        horizontal=True,
-        help="Hybrid combines genre overlap with movie relationships learned from MovieLens ratings.",
-    )
-    balance = st.slider(
-        "Weight on the lower predicted rating",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.5,
-        step=0.05,
-        help="Applies to Balanced. At 0 it matches Average. At 1 only the lower prediction counts.",
-    )
-
+    with st.container(border=True, key="ranking_controls"):
+        model_column, balance_column = st.columns([1, 2], vertical_alignment="center")
+        with model_column:
+            model_name = st.radio(
+                "Prediction model",
+                ("Genre", "Hybrid"),
+                horizontal=True,
+                help="Hybrid combines genre overlap with movie relationships learned from MovieLens ratings.",
+            )
+        with balance_column:
+            balance = st.slider(
+                "Balanced ranking · Weight on lower prediction",
+                min_value=0,
+                max_value=100,
+                value=50,
+                step=5,
+                format="%d%%",
+                help="At 0%, Balanced matches Average. At 100%, only the lower prediction counts.",
+            ) / 100
     average = score_catalog(data_path, first, second, model_name)
     if not average:
         st.info("No unrated movies remain.")
@@ -187,18 +226,18 @@ def main() -> None:
         st.subheader("Popularity")
         st.caption("Ranked by the number of MovieLens ratings.")
         for number, item in enumerate(popular[:TOP_K], 1):
-            show_pick(number, item, f"{popularity[item.movie_id]:,} MovieLens ratings")
+            show_pick("popularity", number, item, f"{popularity[item.movie_id]:,} MovieLens ratings")
     with columns[1]:
         st.subheader("Average")
         st.caption("Ranked by the mean of both predictions.")
         for number, item in enumerate(average[:TOP_K], 1):
-            show_pick(number, item, f"Mean prediction {item.score:.2f}/5")
+            show_pick("average", number, item, f"Mean prediction {item.score:.2f}/5")
     with columns[2]:
         st.subheader("Balanced")
         st.caption("Ranked by a blend of the mean and the lower prediction.")
         for number, item in enumerate(balanced[:TOP_K], 1):
             score = group_score(item.first.score, item.second.score, balance)
-            show_pick(number, item, f"Balanced score {score:.2f}/5")
+            show_pick("balanced", number, item, f"Balanced score {score:.2f}/5")
 
 
 if __name__ == "__main__":
